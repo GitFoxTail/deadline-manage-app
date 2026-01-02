@@ -1,38 +1,33 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 import { Trash2 } from 'lucide-react';
 import { SquarePen } from 'lucide-react';
 import { Plus } from "lucide-react";
+
+import { getData, insertData } from './db';
 
 interface Item {
     name: string;
     deadline: string;
 }
 
-const sampleItems: Array<Item> = [
-    {
-        "name": "お風呂の防カビ燻煙剤",
-        "deadline": "2026-12-31",
-    },
-    {
-        "name": "ブロッコリー冷凍",
-        "deadline": "2026-01-25"
-    },
-    {
-        "name": "レンジフード清掃",
-        "deadline": "2026-12-31"
-    }
-];
-
 export const Table = () => {
-
     const dialogRef = useRef<HTMLDialogElement>(null);
-    const [items, setItems] = useState(sampleItems);
+    const [items, setItems] = useState<Array<Item>>([]);
     const [editName, setEditName] = useState("");
     const [editDeadline, setEditDeadline] = useState("");
     const [editIndex, setEditIndex] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const result = await getData("fox");
+            setItems(result);
+            console.log(result);
+        }
+        fetchData();
+    }, []);
 
     const handleEdit = (item: Item, index: number) => {
         setEditName(item.name);
@@ -45,7 +40,7 @@ export const Table = () => {
         setItems(items.filter((_, i) => i !== index));
     }
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = ('0' + (today.getMonth() + 1)).slice(-2);
@@ -60,6 +55,8 @@ export const Table = () => {
 
         setItems([...items, emptyItem]);
         setEditIndex(newIndex);
+
+        await insertData("fox")
         
         dialogRef.current?.showModal();
     }
@@ -112,6 +109,14 @@ export const Table = () => {
                     </div>
                 )
             })}
+            {/* {datas.map((data, index) => {
+                return(
+                <div key={index}>
+                <div>{data.id}</div>
+                <div>{data.text}</div>
+                </div>
+                )
+            })} */}
             <dialog
                 ref={dialogRef}
                 className="w-1/2 h-1/2 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border rounded-2xl p-5"
