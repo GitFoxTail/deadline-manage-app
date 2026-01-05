@@ -7,10 +7,10 @@ export default function DashboardLayout({
 }) {
   return (
     <html lang="en">
-      <body className="m-3">
+      <body className="">
         {/* Layout UI */}
         {/* Place children where you want to render a page or nested layout */}
-        <main>{children}</main>
+        <main className="">{children}</main>
       </body>
     </html>
   )

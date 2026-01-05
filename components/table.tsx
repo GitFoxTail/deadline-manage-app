@@ -6,153 +6,192 @@ import { Trash2 } from 'lucide-react';
 import { SquarePen } from 'lucide-react';
 import { Plus } from "lucide-react";
 
-import { getData, insertData } from './db';
+import { deleteData, getData, insertData, updateData } from './db';
 
 interface Item {
+    id: number;
+    user: string;
     name: string;
     deadline: string;
 }
 
+interface ItemForm {
+    name: string;
+    deadline: string;
+}
+
+const userName = "fox"
+
 export const Table = () => {
     const dialogRef = useRef<HTMLDialogElement>(null);
     const [items, setItems] = useState<Array<Item>>([]);
+    const [form, setForm] = useState<ItemForm>({
+        name: "",
+        deadline: ""
+    })
+
+    const [mode, setMode] = useState<"add" | "edit" | null>(null);
+    const [editTargetId, setEditTargetId] = useState<number | null>(null);
+    const [editIndex, setEditIndex] = useState<number | null>(null);
     const [editName, setEditName] = useState("");
     const [editDeadline, setEditDeadline] = useState("");
-    const [editIndex, setEditIndex] = useState<number | null>(null);
+
 
     useEffect(() => {
         const fetchData = async () => {
             const result = await getData("fox");
-            setItems(result);
+            setItems(result.map(row => ({
+                id: row.id,
+                user: row.user,
+                name: row.name,
+                deadline: row.deadline,
+            })));
             console.log(result);
         }
         fetchData();
     }, []);
-
-    const handleEdit = (item: Item, index: number) => {
-        setEditName(item.name);
-        setEditDeadline(item.deadline);
-        setEditIndex(index);
-        dialogRef.current?.showModal();
-    }
-
-    const handleDelete = (index: number) => {
-        setItems(items.filter((_, i) => i !== index));
-    }
 
     const handleAdd = async () => {
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = ('0' + (today.getMonth() + 1)).slice(-2);
         const dd = ('0' + today.getDate()).slice(-2);
-        const formatedToday = `${yyyy}-${mm}-${dd}`
-        const emptyItem: Item = {
-            "name": "",
-            "deadline": formatedToday
-        };
 
-        const newIndex = items.length;
+        setMode("add");
+        setEditTargetId(null);
+        setForm({
+            name: "",
+            deadline: `${yyyy}-${mm}-${dd}`,
+        })
 
-        setItems([...items, emptyItem]);
-        setEditIndex(newIndex);
-
-        await insertData("fox")
-        
         dialogRef.current?.showModal();
     }
 
-    const closeDialog = () => {
-        dialogRef.current?.close();
+    const handleEdit = (item: Item) => {
+        setMode("edit");
+        setEditTargetId(item.id);
+
+        const today = new Date(item.deadline);
+        const yyyy = today.getFullYear();
+        const mm = ('0' + (today.getMonth() + 1)).slice(-2);
+        const dd = ('0' + today.getDate()).slice(-2);
+
+        setForm({
+            name: item.name,
+            deadline: `${yyyy}-${mm}-${dd}`,
+        });
+
+        dialogRef.current?.showModal();
     }
 
-    const handleSave = () => {
-        if (editIndex === null) return;
-        const newItems = [...items];
-        newItems[editIndex] = {
-            name: editName,
-            deadline: editDeadline,
+    const handleDelete = async (id: number) => {
+        setItems(items.filter((item) => item.id !== id));
+        await deleteData(id);
+    }
+
+    const closeDialog = () => dialogRef.current?.close();
+
+    const handleSave = async () => {
+        if (!mode) return;
+
+        if (mode === "add") {
+            const inserted = await insertData(
+                userName,
+                form.name,
+                form.deadline
+            );
+
+            setItems([
+                ...items,
+                {
+                    id: inserted.id,
+                    user: userName,
+                    ...form,
+                },
+            ]);
         };
-        setItems(newItems)
+
+
+        if (mode === "edit" && editTargetId !== null) {
+            await updateData(editTargetId, form);
+
+            setItems(items.map(item =>
+                item.id === editTargetId
+                    ? { ...item, ...form }
+                    : item
+            ));
+        }
+
         closeDialog();
     }
 
     return (
         <>
             <div
-                className="items-center flex gap-3 border border-3 w-32 p-3 rounded-2xl hover: cursor-pointer bg-gray-200"
+                className="w-1/4 items-center flex  p-2 m-3 rounded bg-black text-white hover:cursor-pointer hover:bg-gray-500"
                 onClick={handleAdd}
             >
                 <Plus />
-                <p className="text-2xl">追加</p>
+                <p className="text-xl">Add</p>
             </div>
-            {items.map((item, index) => {
+            {items.map((item) => {
                 const deadline = new Date(item.deadline)
                 const today = new Date();
                 const remainingMs = deadline.getTime() - today.getTime();
                 const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
 
                 return (
-                    <div key={index} className="p-5 m-3 border border-teal-500 border-5 rounded-2xl w-3/4 ">
-                        <p className="text-lg" >期限: {deadline.toLocaleDateString()}</p>
-                        <div className='flex mt-2'>
-                            <p className="text-2xl w-4/5">{item.name}</p>
-                            <SquarePen
-                                className='w-8 h-8 ms-5 text-black hover:text-gray-500 hover:cursor-pointer'
-                                onClick={() => handleEdit(item, index)}
-                            />
-                            <Trash2
-                                className='w-8 h-8 ms-5 text-black hover:text-gray-500 hover:cursor-pointer'
-                                onClick={() => handleDelete(index)}
-                            />
+                    <div key={item.id} className="p-5 m-3 border border-3 rounded">
+                        <div  className='flex'>
+                        <p className="text-base w-3/4" >期限: {deadline.toLocaleDateString()}</p>
+                        <SquarePen
+                            className='w-6 h-6 ms-6 text-black hover:text-gray-500 hover:cursor-pointer'
+                            onClick={() => handleEdit(item)}
+                        />
+                        <Trash2
+                            className='w-6 h-6 ms-3 text-black hover:text-gray-500 hover:cursor-pointer'
+                            onClick={() => handleDelete(item.id)}
+                        />
                         </div>
-                        <p className="text-xl mt-2">締め切りまであと <span className='font-bold px-2 text-teal-700'>{remainingDays}</span>日</p>
+                        <div className='flex flex-col mt-1'>
+                            <p className="text-xl">{item.name}</p>
+                        </div>
+                        <p className="text-base mt-1">締め切りまであと<span className='font-bold px-1 text-blue-700'>{remainingDays}</span>日</p>
                     </div>
                 )
             })}
-            {/* {datas.map((data, index) => {
-                return(
-                <div key={index}>
-                <div>{data.id}</div>
-                <div>{data.text}</div>
-                </div>
-                )
-            })} */}
             <dialog
                 ref={dialogRef}
-                className="w-1/2 h-1/2 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border rounded-2xl p-5"
+                className="w-full h-2/3 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border rounded"
             >
-                <h1 className='text-3xl'>内容</h1>
-                {editIndex !== null ? (
-                    <div className='text-xl'>
-                        <h2 className='text-2xl mt-5'>名前</h2>
-                        <input
-                            className='border rounded p-1 w-full'
-                            value={editName}
-                            onChange={(e) => setEditName(e.target.value)}
-                        />
-                        <h2 className='text-2xl mt-5'>期限</h2>
-                        <input
-                            className='border rounded p-1 w-full'
-                            type='date'
-                            value={editDeadline}
-                            onChange={(e) => setEditDeadline(e.target.value)}
-                        />
-                    </div>
-                ) : (
-                    <p>no data</p>
-                )}
-                <div className='flex gap-5 mt-5 justify-end'>
+                <h1 className='text-2xl bg-black text-white p-2'>Detail</h1>
+                <div className='text-xl p-2'>
+                    <h2 className='text-xl'>Content</h2>
+                    <input
+                        className='border rounded p-1 w-full'
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    />
+                    <h2 className='text-xl mt-5'>Deadline</h2>
+                    <input
+                        className='border rounded p-1 w-full'
+                        type='date'
+                        value={form.deadline}
+                        onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                    />
+                </div>
+                <div className='flex gap-5 justify-end p-2'>
                     <button
-                        className='mt-5 px-4 py-2 border rounded'
+                        className='p-2 border rounded'
                         onClick={closeDialog}
                     >
-                        キャンセル
+                        Cancel
                     </button>
                     <button
-                        className='mt-5 px-4 py-2 border rounded bg-teal-700 text-white'
+                        className='px-3 py-2 border rounded bg-black text-white'
                         onClick={handleSave}
                     >
-                        保存
+                        Save
                     </button>
                 </div>
             </dialog>
