@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-import { Trash2 } from 'lucide-react';
+import { GalleryHorizontal, Trash2 } from 'lucide-react';
 import { SquarePen } from 'lucide-react';
 import { Plus } from "lucide-react";
 
@@ -24,6 +24,7 @@ const userName = "fox"
 
 export const Table = () => {
     const dialogRef = useRef<HTMLDialogElement>(null);
+    const [loading, setLoading] = useState(false);
     const [items, setItems] = useState<Array<Item>>([]);
     const [form, setForm] = useState<ItemForm>({
         name: "",
@@ -32,12 +33,9 @@ export const Table = () => {
 
     const [mode, setMode] = useState<"add" | "edit" | null>(null);
     const [editTargetId, setEditTargetId] = useState<number | null>(null);
-    const [editIndex, setEditIndex] = useState<number | null>(null);
-    const [editName, setEditName] = useState("");
-    const [editDeadline, setEditDeadline] = useState("");
-
 
     useEffect(() => {
+        setLoading(true)
         const fetchData = async () => {
             const result = await getData("fox");
             setItems(result.map(row => ({
@@ -49,9 +47,11 @@ export const Table = () => {
             console.log(result);
         }
         fetchData();
+        setLoading(false)
     }, []);
 
     const handleAdd = async () => {
+        
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = ('0' + (today.getMonth() + 1)).slice(-2);
@@ -85,8 +85,10 @@ export const Table = () => {
     }
 
     const handleDelete = async (id: number) => {
+        setLoading(true);
         setItems(items.filter((item) => item.id !== id));
         await deleteData(id);
+        setLoading(false);
     }
 
     const closeDialog = () => dialogRef.current?.close();
@@ -94,6 +96,8 @@ export const Table = () => {
     const handleSave = async () => {
         if (!mode) return;
 
+        closeDialog();
+        setLoading(true);
         if (mode === "add") {
             const inserted = await insertData(
                 userName,
@@ -111,7 +115,6 @@ export const Table = () => {
             ]);
         };
 
-
         if (mode === "edit" && editTargetId !== null) {
             await updateData(editTargetId, form);
 
@@ -121,8 +124,7 @@ export const Table = () => {
                     : item
             ));
         }
-
-        closeDialog();
+        setLoading(false);
     }
 
     return (
@@ -134,6 +136,10 @@ export const Table = () => {
                 <Plus />
                 <p className="text-xl">Add</p>
             </div>
+            <div className={`flex ms-5 ${loading ? "" : "hidden"}`}>
+                <div className="animate-spin h-5 w-5 border-2 border-gray-500 rounded-full border-t-transparent"></div>
+                <div className="ms-2">Loading...</div>
+            </div>
             {items.map((item) => {
                 const deadline = new Date(item.deadline)
                 const today = new Date();
@@ -142,16 +148,16 @@ export const Table = () => {
 
                 return (
                     <div key={item.id} className="p-5 m-3 border border-3 rounded">
-                        <div  className='flex'>
-                        <p className="text-base w-3/4" >期限: {deadline.toLocaleDateString()}</p>
-                        <SquarePen
-                            className='w-6 h-6 ms-6 text-black hover:text-gray-500 hover:cursor-pointer'
-                            onClick={() => handleEdit(item)}
-                        />
-                        <Trash2
-                            className='w-6 h-6 ms-3 text-black hover:text-gray-500 hover:cursor-pointer'
-                            onClick={() => handleDelete(item.id)}
-                        />
+                        <div className='flex'>
+                            <p className="text-base w-3/4" >期限: {deadline.toLocaleDateString()}</p>
+                            <SquarePen
+                                className='w-6 h-6 ms-6 text-black hover:text-gray-500 hover:cursor-pointer'
+                                onClick={() => handleEdit(item)}
+                            />
+                            <Trash2
+                                className='w-6 h-6 ms-3 text-black hover:text-gray-500 hover:cursor-pointer'
+                                onClick={() => handleDelete(item.id)}
+                            />
                         </div>
                         <div className='flex flex-col mt-1'>
                             <p className="text-xl">{item.name}</p>
