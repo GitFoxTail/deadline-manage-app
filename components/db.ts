@@ -4,11 +4,13 @@ import { neon } from "@neondatabase/serverless";
 interface Item {
     name: string;
     deadline: string;
+    category: number;
 }
 
 interface ItemForm {
     name: string;
     deadline: string;
+    category: number;
 }
 
 export async function getData(user: string) {
@@ -21,13 +23,14 @@ export async function getData(user: string) {
 export async function insertData(
     user: string, 
     name: string, 
-    deadline: string
+    deadline: string,
+    category: number,
 ): Promise<{ id: number }> {
     const sql = neon(process.env.DATABASE_URL as string);
 
     const result = await sql`
-        INSERT INTO deadlinemanage ("user", "name", "deadline") 
-        values (${user}, ${name}, ${deadline}) 
+        INSERT INTO deadlinemanage ("user", "name", "deadline", "category") 
+        values (${user}, ${name}, ${deadline}, ${category}) 
         RETURNING id
     `;
     
@@ -50,7 +53,8 @@ export async function updateData(id: number, form: ItemForm): Promise<void> {
         UPDATE deadlinemanage 
         SET 
             name = ${form.name}, 
-            deadline = ${form.deadline} 
+            deadline = ${form.deadline},
+            category = ${form.category}
         WHERE id = ${id}
     `;
 }

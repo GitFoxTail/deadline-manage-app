@@ -13,26 +13,32 @@ interface Item {
     user: string;
     name: string;
     deadline: string;
+    category: number;
 }
 
 interface ItemForm {
     name: string;
     deadline: string;
+    category: number;
 }
 
 const userName = "fox"
 
 export const Table = () => {
     const dialogRef = useRef<HTMLDialogElement>(null);
+    const deleteDialogRef = useRef<HTMLDialogElement>(null);
     const [loading, setLoading] = useState(false);
     const [items, setItems] = useState<Array<Item>>([]);
     const [form, setForm] = useState<ItemForm>({
         name: "",
-        deadline: ""
+        deadline: "",
+        category: 0,
     })
 
     const [mode, setMode] = useState<"add" | "edit" | null>(null);
     const [editTargetId, setEditTargetId] = useState<number | null>(null);
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [category, setCategory] = useState(0)
 
     useEffect(() => {
         setLoading(true)
@@ -43,6 +49,7 @@ export const Table = () => {
                 user: row.user,
                 name: row.name,
                 deadline: row.deadline,
+                category: row.category,
             })));
             console.log(result);
         }
@@ -51,7 +58,7 @@ export const Table = () => {
     }, []);
 
     const handleAdd = async () => {
-        
+
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = ('0' + (today.getMonth() + 1)).slice(-2);
@@ -62,6 +69,7 @@ export const Table = () => {
         setForm({
             name: "",
             deadline: `${yyyy}-${mm}-${dd}`,
+            category: 0,
         })
 
         dialogRef.current?.showModal();
@@ -79,19 +87,27 @@ export const Table = () => {
         setForm({
             name: item.name,
             deadline: `${yyyy}-${mm}-${dd}`,
+            category: category,
         });
 
         dialogRef.current?.showModal();
     }
 
-    const handleDelete = async (id: number) => {
-        setLoading(true);
-        setItems(items.filter((item) => item.id !== id));
-        await deleteData(id);
-        setLoading(false);
+    const handleDeleteConfirm = async (id: number) => {
+        deleteDialogRef.current?.showModal();
+        setDeleteTargetId(id);
     }
 
     const closeDialog = () => dialogRef.current?.close();
+    const closeDeleteDialog = () => deleteDialogRef.current?.close();
+
+    const handleDeleteExecute = async () => {
+        setLoading(true);
+        setItems(items.filter((item) => item.id !== deleteTargetId));
+        if (deleteTargetId) { await deleteData(deleteTargetId); }
+        setLoading(false);
+        closeDeleteDialog();
+    }
 
     const handleSave = async () => {
         if (!mode) return;
@@ -102,7 +118,8 @@ export const Table = () => {
             const inserted = await insertData(
                 userName,
                 form.name,
-                form.deadline
+                form.deadline,
+                form.category,
             );
 
             setItems([
@@ -129,50 +146,102 @@ export const Table = () => {
 
     return (
         <>
-            <div
-                className="w-1/4 items-center flex  p-2 m-3 rounded bg-black text-white hover:cursor-pointer hover:bg-gray-500"
-                onClick={handleAdd}
-            >
-                <Plus />
-                <p className="text-xl">Add</p>
+            <div className="text-lg grid grid-cols-3 m-3 gap-5 my-5">
+                <button
+                    className={`border border-3 rounded ${category === 0 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                    onClick={() => setCategory(0)}
+                >タスク</button>
+                <button
+                    className={`border border-3 rounded ${category === 1 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                    onClick={() => setCategory(1)}
+                >賞味期限</button>
+                <button
+                    className={`border border-3 rounded ${category === 2 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                    onClick={() => setCategory(2)}
+                >その他</button>
+            </div>
+            <div className='justify-items-end'>
+                <button
+                    className="items-center flex  p-2 m-3 rounded bg-black text-white hover:cursor-pointer hover:bg-gray-500"
+                    onClick={handleAdd}
+                >
+                    <Plus />
+                </button>
             </div>
             <div className={`flex ms-5 ${loading ? "" : "hidden"}`}>
                 <div className="animate-spin h-5 w-5 border-2 border-gray-500 rounded-full border-t-transparent"></div>
                 <div className="ms-2">Loading...</div>
             </div>
-            {items.map((item) => {
+            {items.filter((e) => e.category === category).map((item) => {
                 const deadline = new Date(item.deadline)
                 const today = new Date();
                 const remainingMs = deadline.getTime() - today.getTime();
                 const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
 
                 return (
-                    <div key={item.id} className="p-5 m-3 border border-3 rounded">
+                    <div key={item.id} className="p-2 m-2 border border-2 rounded">
                         <div className='flex'>
-                            <p className="text-base w-3/4" >期限: {deadline.toLocaleDateString()}</p>
+                            <p className="text-base w-3/4" >期限まで<span className='font-bold px-1 text-blue-700 text-xl'>{remainingDays}</span>日（ {deadline.toLocaleDateString()}）</p>
                             <SquarePen
                                 className='w-6 h-6 ms-6 text-black hover:text-gray-500 hover:cursor-pointer'
                                 onClick={() => handleEdit(item)}
                             />
                             <Trash2
                                 className='w-6 h-6 ms-3 text-black hover:text-gray-500 hover:cursor-pointer'
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => handleDeleteConfirm(item.id)}
                             />
                         </div>
                         <div className='flex flex-col mt-1'>
                             <p className="text-xl">{item.name}</p>
                         </div>
-                        <p className="text-base mt-1">締め切りまであと<span className='font-bold px-1 text-blue-700'>{remainingDays}</span>日</p>
                     </div>
                 )
             })}
+            <dialog
+                ref={deleteDialogRef}
+                className="w-full h-1/3 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border rounded"
+            >
+                <h1 className='text-2xl bg-black text-white p-2'>Detail</h1>
+                <div className='text-xl p-2 my-5'>
+                    選択したアイテムを削除しますか？
+                </div>
+                <div className='flex gap-5 justify-center p-2'>
+                    <button
+                        className='p-2 border rounded'
+                        onClick={closeDeleteDialog}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        className='px-3 py-2 border rounded bg-black text-white'
+                        onClick={handleDeleteExecute}
+                    >
+                        Delete
+                    </button>
+                </div>
+            </dialog>
             <dialog
                 ref={dialogRef}
                 className="w-full h-2/3 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border rounded"
             >
                 <h1 className='text-2xl bg-black text-white p-2'>Detail</h1>
                 <div className='text-xl p-2'>
-                    <h2 className='text-xl'>Content</h2>
+                    <h2 className='text-xl mt-5'>Category</h2>
+                    <div className="text-lg grid grid-cols-3 gap-3 mt-2">
+                        <button
+                            className={`border border-3 rounded ${form.category === 0 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                            onClick={() => setForm({ ...form, category: 0 })}
+                        >タスク</button>
+                        <button
+                            className={`border border-3 rounded ${form.category === 1 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                            onClick={() => setForm({ ...form, category: 1 })}
+                        >賞味期限</button>
+                        <button
+                            className={`border border-3 rounded ${form.category === 2 ? "border-black bg-black text-white" : "border-gray-500"}`}
+                            onClick={() => setForm({ ...form, category: 2 })}
+                        >その他</button>
+                    </div>
+                    <h2 className='text-xl mt-5'>Content</h2>
                     <input
                         className='border rounded p-1 w-full'
                         value={form.name}
